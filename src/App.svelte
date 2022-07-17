@@ -1,30 +1,54 @@
 <script>
-	import { basicSpells, specialSpells } from './spells.js';
 	import CardManager from './CardManager.svelte';
 	import Card from './Card.svelte';
+	import Dice from './utils/Dice';
+	import BasePlayer from "./game/BasePlayer";
+	import firebase from "./utils/firebase";
+	import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+	
+	import Room from './utils/Room';
 
-	const getRandomDiceVal = (max = 6) => {
-		return Math.floor(Math.random() * max) + 1;
-	};
-
-	const getBiggerResult = (max = 6) => {
-		return Math.floor(Math.random() * max) + 1;
-	};
+	const gameRoom = Room;
+	
+	const player1 = BasePlayer;
+	const player2 = BasePlayer;
 
 	let rounds = 0;
 	let maxSpells = 0;
 	let startingHp = 0;
 	let startingPlayer = 0; // 1 is 1 - 2 is 2
+	let userId = '';
+	let roomId = '';
 
 	const decideStartingPlayer = () => {
-		startingPlayer = getBiggerResult();
+		startingPlayer = Dice.roll();
 	};
 
 	const selectSpells = () => {
 
 	};
+	
+	const auth = getAuth();
 
-	function* gameStep() {
+	async function* gameStep() {
+		
+		// Sign-in to Firebase
+		console.log('Sign-in to Firebase');
+		signInAnonymously(auth)
+				.then(() => {
+					console.log('Anon Auth Successfully!');
+				});
+		onAuthStateChanged(auth, (user) => {
+			if (user) {
+				userId = user.uid;
+				gameRoom.hostId = userId;
+				console.log('User Signed In');
+			} else {
+				console.log('User Signed Out');
+			}
+		})
+		yield
+		
 		// Show intro animation "Start"
 		console.log('Show intro animation "Start"');
 		yield;
@@ -35,7 +59,8 @@
 
 		// Roll dice for rounds
 		console.log('Roll dice for rounds');
-		rounds = getRandomDiceVal();
+		rounds = Dice.roll();
+		gameRoom.rounds = rounds;
 		yield;
 
 		// Show round decision animation
@@ -47,8 +72,9 @@
 		yield;
 
 		// Roll dice for spells
-		maxSpells = getRandomDiceVal();
 		console.log('Roll dice for spells');
+		maxSpells = Dice.roll();
+		gameRoom.spells = maxSpells;
 		yield;
 
 		// Show spells decision animation
@@ -60,57 +86,31 @@
 		yield;
 
 		// Roll dice for startring hp
-		startingHp = getRandomDiceVal();
-		console.log('Roll dice for startring hp');
+		startingHp = Dice.roll();
+		player1.hp = startingHp;
+		player2.hp = startingHp;
+		gameRoom.hp = startingHp;
+		console.log('Roll dice for starting hp');
 		yield;
 
 		// Show hp decision animation
 		console.log('Show hp decision animation');
 		yield;
+		
+		// Assign GameRoom ID
+		console.log('Assigning GameRoom ID');
+		await gameRoom.getId();
+		yield
+		
+		while(player1.hp > 0 && player2.hp > 0) {
+			console.log('Current Turn:', gameRoom.current_turn);
+			gameRoom.switchTurn();
+			yield;
+		}
 	}
 
 	const events = [];
-
-	const basePlayer = {
-		// Game props
-		hp: startingHp,
-		selectedSpells: [
-			{
-				name: 'Hack',
-				level: 5,
-				disabled: false
-			},
-			{
-				name: 'Hack',
-				level: 5,
-				disabled: false
-			},
-			{
-				name: 'Hack',
-				level: 5,
-				disabled: false
-			},
-			{
-				name: 'Hack',
-				level: 5,
-				disabled: false
-			},
-			{
-				name: 'Hack',
-				level: 5,
-				disabled: false
-			},
-			{
-				name: 'Hack',
-				level: 5,
-				disabled: false
-			},
-		],
-		activeBuffs: [],
-		log: [],
-		// Other cosmetic props
-	};
-
+	
 	const currentStep = gameStep();
 
 	let gameStarted = false;
@@ -123,7 +123,7 @@
 <div class="grid grid-rows-[12fr_8fr] w-full h-screen">
 	<div class="w-full h-full bg-red-300 grid grid-cols-[4fr_8fr_4fr]">
 		<div class="bg-red-200 p-2 grid gap-2">
-			{#each basePlayer.selectedSpells as spell, i}
+			{#each player1.selectedSpells as spell, i}
 				<button class="bg-white rounded-4 border border-gray-500 active:bg-gray-100 text-12 p-2 w-full">
 					{i+1}. {spell.name} ({spell.level})
 				</button>
@@ -153,7 +153,7 @@
 			</div>
 		</div>
 		<div class="bg-red-200 p-2 grid gap-2">
-			{#each basePlayer.selectedSpells as spell, i}
+			{#each player2.selectedSpells as spell, i}
 				<button class="bg-white rounded-4 border border-gray-500 active:bg-gray-100 text-12 p-2 w-full">
 					{i+1}. {spell.name} ({spell.level})
 				</button>
@@ -182,7 +182,7 @@
 	<Card x={16} y={window.innerHeight - 148} classes="grid gap-2">
 		<button
 			non-draggable
-			on:click={() => goNextStep()}
+			on:click={() =>goNextStep()}
 			class="bg-blue-600 text-white px-2 py-1.5 rounded-8 active:bg-blue-700 cursor-auto">
 			Next Step
 		</button>

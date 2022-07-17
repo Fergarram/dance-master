@@ -1,6 +1,6 @@
 <script>
 import { setContext } from 'svelte';
-import { makeid } from './utils.js';
+import { makeid } from './utils';
 
 let stackId = makeid();
 let cardStack = [];

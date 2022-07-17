@@ -1,6 +1,6 @@
 <script>
     import { onMount, getContext } from 'svelte';
-    import { makeid } from './utils.js';
+    import { makeid } from './utils';
 
     export let x = 0;
     export let y = 0;
