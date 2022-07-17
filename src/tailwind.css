@@ -1,7 +1,16 @@
 @tailwind base;
 @tailwind utilities;
 
-/*@layer utilities {}*/
+@layer utilities {
+    .text-shadow {
+        text-shadow:
+            3px 3px 0 #000,
+            -1px -1px 0 #000,  
+            1px -1px 0 #000,
+            -1px 1px 0 #000,
+            1px 1px 0 #000;
+    }
+}
 
 .draggable {
     position: absolute;

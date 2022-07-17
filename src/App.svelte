@@ -1,116 +1,125 @@
 <script>
+	import { basicSpells, specialSpells } from './spells.js';
+	import { scale } from 'svelte/transition';
+	import { quintOut } from "svelte/easing";
 	import CardManager from './CardManager.svelte';
+	import Dice from './Dice.svelte';
 	import Card from './Card.svelte';
-	import Dice from './utils/Dice';
-	import BasePlayer from "./game/BasePlayer";
-	import firebase from "./utils/firebase";
-	import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-	
-	import Room from './utils/Room';
 
-	const gameRoom = Room;
-	
-	const player1 = BasePlayer;
-	const player2 = BasePlayer;
+	const getRandomDiceVal = (max = 6) => {
+		return Math.floor(Math.random() * max) + 1;
+	};
+
+	const getBiggerResult = (max = 6) => {
+		return Math.floor(Math.random() * max) + 1;
+	};
+
+	const messageDuration = 500;
 
 	let rounds = 0;
 	let maxSpells = 0;
 	let startingHp = 0;
 	let startingPlayer = 0; // 1 is 1 - 2 is 2
-	let userId = '';
-	let roomId = '';
+	let godNumber = 0;
+
+	let bigMessage = '';
+
+	let background = 'back-darker.png';
 
 	const decideStartingPlayer = () => {
-		startingPlayer = Dice.roll();
+		startingPlayer = getBiggerResult();
 	};
 
 	const selectSpells = () => {
 
 	};
-	
-	const auth = getAuth();
 
-	async function* gameStep() {
-		
-		// Sign-in to Firebase
-		console.log('Sign-in to Firebase');
-		signInAnonymously(auth)
-				.then(() => {
-					console.log('Anon Auth Successfully!');
-				});
-		onAuthStateChanged(auth, (user) => {
-			if (user) {
-				userId = user.uid;
-				gameRoom.hostId = userId;
-				console.log('User Signed In');
-			} else {
-				console.log('User Signed Out');
-			}
-		})
-		yield
-		
-		// Show intro animation "Start"
-		console.log('Show intro animation "Start"');
-		yield;
+	const sounds = {
+		death: [
+			new Audio('/death0.mp3'),
+			new Audio('/death1.mp3')
+		],
+		burn: [
+			new Audio('/burn0.mp3'),
+			new Audio('/burn1.mp3')
+		],
+		shortpain: [
+			new Audio('/shortpain0.mp3'),
+			new Audio('/shortpain1.mp3'),
+			new Audio('/shortpain2.mp3'),
+			new Audio('/shortpain3.mp3')
+		],
+	}
 
-		// Show "Rounds" animation
-		console.log('Show "Rounds" animation');
+	function* gameStep() {
+		bigMessage = '';
+		sounds.burn[0].play();
+		setTimeout(() => {
+			bigMessage = 'Start Game';
+		}, messageDuration);
 		yield;
 
 		// Roll dice for rounds
-		console.log('Roll dice for rounds');
-		rounds = Dice.roll();
-		gameRoom.rounds = rounds;
+		godNumber = getRandomDiceVal();
+		rounds = godNumber;
+		bigMessage = '';
+		setTimeout(() => {
+			bigMessage = `${rounds} Rounds`;
+		}, messageDuration);
 		yield;
 
-		// Show round decision animation
-		console.log('Show round decision animation');
+		// Roll dice for Spells
+		godNumber = getRandomDiceVal();
+		maxSpells = godNumber;
+		bigMessage = '';
+		setTimeout(() => {
+			bigMessage = `Pick ${maxSpells} Spells`;
+		}, messageDuration);
 		yield;
-
-		// Show "Spells" animation
-		console.log('Show "Spells" animation');
-		yield;
-
-		// Roll dice for spells
-		console.log('Roll dice for spells');
-		maxSpells = Dice.roll();
-		gameRoom.spells = maxSpells;
-		yield;
-
-		// Show spells decision animation
-		console.log('Show spells decision animation');
-		yield;
-
-		// Show "starting Hp" animation
-		console.log('Show "starting Hp" animation');
-		yield;
-
-		// Roll dice for startring hp
-		startingHp = Dice.roll();
-		player1.hp = startingHp;
-		player2.hp = startingHp;
-		gameRoom.hp = startingHp;
-		console.log('Roll dice for starting hp');
-		yield;
-
-		// Show hp decision animation
-		console.log('Show hp decision animation');
-		yield;
-		
-		// Assign GameRoom ID
-		console.log('Assigning GameRoom ID');
-		await gameRoom.getId();
-		yield
-		
-		while(player1.hp > 0 && player2.hp > 0) {
-			console.log('Current Turn:', gameRoom.current_turn);
-			gameRoom.switchTurn();
-			yield;
-		}
 	}
 
 	const events = [];
-	
+
+	const basePlayer = {
+		// Game props
+		hp: startingHp,
+		selectedSpells: [
+			{
+				name: 'Hack',
+				level: 5,
+				disabled: false
+			},
+			{
+				name: 'Hack',
+				level: 5,
+				disabled: false
+			},
+			{
+				name: 'Hack',
+				level: 5,
+				disabled: false
+			},
+			{
+				name: 'Hack',
+				level: 5,
+				disabled: false
+			},
+			{
+				name: 'Hack',
+				level: 5,
+				disabled: false
+			},
+			{
+				name: 'Hack',
+				level: 5,
+				disabled: false
+			},
+		],
+		activeBuffs: [],
+		log: [],
+		// Other cosmetic props
+	};
+
 	const currentStep = gameStep();
 
 	let gameStarted = false;
@@ -120,69 +129,88 @@
 	};
 </script>
 
-<div class="grid grid-rows-[12fr_8fr] w-full h-screen">
-	<div class="w-full h-full bg-red-300 grid grid-cols-[4fr_8fr_4fr]">
-		<div class="bg-red-200 p-2 grid gap-2">
-			{#each player1.selectedSpells as spell, i}
-				<button class="bg-white rounded-4 border border-gray-500 active:bg-gray-100 text-12 p-2 w-full">
-					{i+1}. {spell.name} ({spell.level})
-				</button>
-			{/each}
+<div
+	class="grid w-full h-screen bg-cover"
+	style="background-image: url(/{background})">
+	<div
+		class="top-0 left-0 absolute w-full h-full bg-cover pointer-events-none"
+		style="background-image: url(/clouds.png)">
+	</div>
+	<div
+		class="top-0 left-0 absolute w-full h-full bg-cover pointer-events-none"
+		style="background-image: url(/mist.png)">
+	</div>
+	<div class="w-full h-full grid grid-cols-[4fr_8fr_4fr]">
+		<div class="p-2 grid grid-rows-[1fr_auto] gap-2">
+			<div class="overflow-scroll p-2 text-black">
+				
+			</div>
+			<div class="bg-stone-800 grid gap-2 p-2">
+				{#each basePlayer.selectedSpells as spell, i}
+					<button
+						class="text-white text-16 w-full text-left bg-black/20 z-[20] relative p-2 hover:bg-black/40 active:bg-black/80">
+						{i+1}. {spell.name} ({spell.level})
+					</button>
+				{/each}
+			</div>
 		</div>
-		<div class="bg-blue-200 relative">
+		<div class="relative">
 			<div class="bg-gray-600 absolute top-0 left-1/2 -translate-x-1/2 py-4 px-10 flex gap-5 whitespace-nowrap text-white">
 				<div>Rounds: {rounds}</div>
 				<div>Spells: {maxSpells}</div>
 				<div>HP: {startingHp}</div>
 			</div>
-			<div class="absolute bottom-6 bg-red-400 left-[6%] w-1/4 h-1/2">
-				p1 body
-				<div class="absolute -right-10 w-14 h-14 bg-blue-500 bottom-5">
-					p1 dice
+			<div class="absolute bottom-3 left-[6%] w-[35%] h-3/4 flex items-center justify-center">
+				<img src="/p1.png" alt="" class="object-bottom w-full h-full object-contain"/>
+				<div class="absolute -right-4 w-14 h-14 bottom-5">
+					<Dice />
 				</div>
 			</div>
-			<div class="absolute bottom-6 bg-red-400 right-[6%] w-1/4 h-1/2">
-				p2 body
+			<div class="absolute bottom-3 right-[6%] w-[35%] h-3/4 flex items-center justify-center">
+				<img src="/p2.png" alt="" class="object-bottom w-full h-full object-contain"/>
 
-				<div class="absolute -left-10 w-14 h-14 bg-blue-500 bottom-5">
-					p2 dice
+				<div class="absolute -left-4 w-14 h-14 bottom-5">
+					<Dice />
 				</div>
 			</div>
-			<div class="absolute top-20 left-1/2 -translate-x-1/2 bg-blue-500 w-14 h-14">
-				god dice
+			<div class="absolute top-20 left-1/2 -translate-x-1/2 w-14 h-14">
+				<Dice show={godNumber} />
 			</div>
 		</div>
-		<div class="bg-red-200 p-2 grid gap-2">
-			{#each player2.selectedSpells as spell, i}
-				<button class="bg-white rounded-4 border border-gray-500 active:bg-gray-100 text-12 p-2 w-full">
-					{i+1}. {spell.name} ({spell.level})
-				</button>
-			{/each}
-		</div>
-	</div>
-	<div class="w-full h-full bg-blue-300 grid grid-cols-[4fr_5fr_4fr]">
-		<div class="bg-green-200 relative">
-			<div class="flex items-center justify-center w-full h-full">char</div>
-			<div class="absolute w-10 h-full bg-gray-600/50 left-0 top-0">
-				buffs
+		<div class="p-2 grid grid-rows-[1fr_auto] gap-2">
+			<div class="overflow-scroll p-2 text-black">
+				
 			</div>
-		</div>
-		<div class="bg-orange-200">
-			<div>log</div>
-		</div>
-		<div class="bg-green-200 relative">
-			<div class="flex items-center justify-center w-full h-full">char</div>
-			<div class="absolute w-10 h-full bg-gray-600/50 right-0 top-0">
-				buffs
+			<div class="bg-stone-800 grid gap-2 p-2">
+				{#each basePlayer.selectedSpells as spell, i}
+					<button
+						class="text-white text-16 w-full text-left bg-black/20 z-[20] relative p-2 hover:bg-black/40 active:bg-black/80">
+						{i+1}. {spell.name} ({spell.level})
+					</button>
+				{/each}
 			</div>
 		</div>
 	</div>
+	{#if bigMessage}
+		<div transition:scale={{ duration: 150, easing: quintOut }} class="text-64 font-bold absolute top-0 left-0 w-full h-full pointer-events-none font-verga text-azulioto flex items-center justify-center z-[50]">
+			<!-- <div class="bg-white rounded-full absolute w-full mt-2 h-full top-0 left-0 blur opacity-50"></div> -->
+			<div class="relative whitespace-nowrap">
+				{bigMessage}
+			</div>
+		</div>
+	{/if}
 </div>
 <CardManager>
-	<Card x={16} y={window.innerHeight - 148} classes="grid gap-2">
+	<Card x={48} y={48} classes="grid gap-2">
 		<button
 			non-draggable
-			on:click={() =>goNextStep()}
+			on:click={() => goNextStep()}
+			class="bg-blue-600 text-white px-2 py-1.5 rounded-8 active:bg-blue-700 cursor-auto">
+			Next Step
+		</button>
+		<button
+			non-draggable
+			on:click={() => goNextStep()}
 			class="bg-blue-600 text-white px-2 py-1.5 rounded-8 active:bg-blue-700 cursor-auto">
 			Next Step
 		</button>
@@ -223,6 +251,5 @@
 		{/if}
 	{/each} -->
 </CardManager>
-
 <style>
 </style>

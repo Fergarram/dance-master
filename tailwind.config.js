@@ -8,9 +8,8 @@ module.exports = {
 	],
 	theme: {
 		fontFamily: {
-			'sans': [ '-apple-system', 'Inter', 'Roboto', 'Helvetica', 'Sans-Serif' ],
-			'serif': [ 'Georgia', 'Times New Roman', 'Serif' ],
-			'mono': [ 'Monospace' ]
+			'sans': [ 'Oldstyle HPLHS', '-apple-system', 'Inter', 'Roboto', 'Helvetica', 'Sans-Serif' ],
+			'verga': ['Oldstyle HPLHS']
 		},
 		fontSize: {
 			'12': '0.75rem',
@@ -57,6 +56,9 @@ module.exports = {
 			'3xl': '100rem',     // 1600px
 		},
 		extend: {
+			colors: {
+				'azulioto': '#40D9CC'
+			},
 			columns: {
 				'unset': 'unset',
 			},
