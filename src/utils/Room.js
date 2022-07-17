@@ -31,7 +31,7 @@ const generateID = async (
   });
   roomRef = ref(db, `dice-master/rooms/room_${id}`);
   await update(roomRef, {
-    current_turn: 1,
+    current_turn: 0,
     host_id,
     host_username,
     host_stats,
@@ -71,7 +71,7 @@ const Room = {
     spells: 6,
     hp: 10,
   },
-  current_turn: 1,
+  current_turn: 0,
   id: '',
   has_space: true,
   getId: async function () {
@@ -97,6 +97,10 @@ const Room = {
     } else {
       console.log('This room is playing already!');
     }
+  },
+  setTurn: async function(turn) {
+    this.current_turn = turn;
+    await updateTurn(this.current_turn);
   },
   switchTurn: async function() {
     this.current_turn = this.current_turn === 1 ? 2 : 1;

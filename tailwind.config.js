@@ -56,6 +56,21 @@ module.exports = {
 			'3xl': '100rem',     // 1600px
 		},
 		extend: {
+			animation: {
+		    	mist: 'mist 10s ease infinite',
+		    },
+		    keyframes: {
+		    	mist: {
+		          '0%, 100%': {
+		          	transform: 'translateY(5%)',
+				    'animation-timing-function': 'ease'
+		          },
+		          '50%': {
+		          	transform: 'translateY(0)',
+				    'animation-timing-function': 'ease'
+		          },
+		        }
+		    },
 			colors: {
 				'azulioto': '#40D9CC'
 			},

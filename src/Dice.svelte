@@ -1,25 +1,12 @@
 <script>
 import { onMount } from 'svelte';
 
-let diceEl;
 export let show = 0;
-
-// let clock = setInterval(() => {
-// 	let number = Math.floor((Math.random() * 6) + 1);
-// 	show = number;
-// }, 400);
-
-const roll = () => {
-	show = (show > 1) ? show - 1 : show + 1;
-	setTimeout(() => {
-		let number = Math.floor((Math.random() * 6) + 1);
-		show = number;
-	}, 200);
-};
+export let throwDuration = 1000;
 </script>
 
-<button class="w-full h-full" on:click={roll}>
-	<div class="dice dice-one show-{show}">
+<div class="w-full h-full">
+	<div class="dice dice-one show-{show}" style="transition: transform {throwDuration}ms">
 		<div
 			id="dice-one-side-one"
 			class="side one bg-cover bg-no-repeat"
@@ -51,7 +38,7 @@ const roll = () => {
 			style="background-image: url(/dieface6.png);">
 		</div>
 	</div>
-</button>
+</div>
 
 <style>
 .dice {
@@ -59,7 +46,6 @@ const roll = () => {
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  transition: transform 300ms; 
 }
 
 .dot {
