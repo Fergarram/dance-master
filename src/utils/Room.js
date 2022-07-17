@@ -8,17 +8,16 @@ let roomRef = '';
 const generateID = async (
   host_id, host_username, host_stats,
   opponent_id, opponent_username, opponent_stats,
-  room_stats
+  stats
 ) => {
   const today = new Date();
   let count = 0;
   const roomCountRef = ref(db, 'dice-master/rooms_count');
   await get(roomCountRef).then((snapshot) => {
     if (snapshot.exists()) {
-      console.log(snapshot.val());
       count = snapshot.val();
     } else {
-      console.log("No data available");
+      console.log("No [room_count] data available");
     }
   }).catch((error) => {
     console.error(error);
@@ -31,7 +30,7 @@ const generateID = async (
   });
   roomRef = ref(db, `dice-master/rooms/room_${id}`);
   await update(roomRef, {
-    current_turn: 0,
+    current_turn: 1,
     host_id,
     host_username,
     host_stats,
@@ -40,18 +39,36 @@ const generateID = async (
     opponent_stats,
     winner_username: '',
     winner_id: '',
-    room_stats,
+    stats,
     date: today,
   });
 
-  console.log(roomCountRef);
+  await subscribeRoom();
 
   return id;
-}
+};
+
+const subscribeRoom = async(player) => {
+  await onValue(roomRef, (snapshot) => {
+    const data = snapshot.val();
+    Object.assign(Room, data);
+    console.log('Room:', Room);
+  });
+};
+
+const updateOpponent = async(opponent_id, opponent_username, opponent_stats) => {
+  await subscribeRoom();
+};
 
 const updateTurn = async(turn) => {
   await update(roomRef, {
     current_turn: turn,
+  })
+};
+
+const updateSpell = async(spell) => {
+  await update(roomRef, {
+
   })
 }
 
@@ -60,18 +77,20 @@ const Room = {
   host_username: 'Devlious',
   host_stats: {
     hp: 10,
+    selected_character: '',
   },
   opponent_id: '',
   opponent_username: '',
   opponent_stats: {
     hp: 10,
+    selected_character: '',
   },
-  room_stats: {
+  stats: {
     rounds: 1,
     spells: 6,
     hp: 10,
   },
-  current_turn: 0,
+  current_turn: 1, // 1 -> Player1 : 2 -> Player2
   id: '',
   has_space: true,
   getId: async function () {
@@ -83,24 +102,21 @@ const Room = {
         this.opponent_id,
         this.opponent_username,
         this.opponent_stats,
-        this.room_stats,
+        this.stats,
       );
       return this.id
     } else {
       return this.id
     }
   },
-  joinRoom: async function (opponentId, opponentUsername) {
+  joinRoom: async function (opponent_id, opponent_username) {
     if (this.has_space) {
-      this.opponent_id = opponentId;
-      this.opponent_username = opponentUsername;
+      this.opponent_id = opponent_id;
+      this.opponent_username = opponent_username;
+      await updateOpponent(opponent_id, opponent_username, this.opponent_stats);
     } else {
       console.log('This room is playing already!');
     }
-  },
-  setTurn: async function(turn) {
-    this.current_turn = turn;
-    await updateTurn(this.current_turn);
   },
   switchTurn: async function() {
     this.current_turn = this.current_turn === 1 ? 2 : 1;
@@ -108,6 +124,12 @@ const Room = {
   },
   canStart: function() {
     return this.opponent_id !== ''
+  },
+  selectSpell: async function(spell) {
+    await updateSpell(spell)
+  },
+  getHostUsername: function() {
+    return this.host_username;
   }
 }
 
