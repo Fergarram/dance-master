@@ -417,8 +417,9 @@
 			</button>
 			<button
 				non-draggable
+				disabled
 				on:click={() => currentStep.next()}
-				class="bg-blue-600 text-white px-2 py-1.5 rounded-8 active:bg-blue-700 cursor-auto font-medium">
+				class="bg-blue-600 text-white px-2 py-1.5 rounded-8 cursor-auto font-medium opacity-50">
 				Play Online
 			</button>
 		</div>
