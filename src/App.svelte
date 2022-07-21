@@ -1,59 +1,19 @@
 <script>
-	import { scale } from 'svelte/transition';
+	import { scale, blur } from 'svelte/transition';
 	import { onMount } from 'svelte';
 	import { quintOut } from "svelte/easing";
 	import CardManager from './CardManager.svelte';
-	import Dado from './Dice.svelte';
-	import Dice from './utils/Dice';
+	import Dice from './Dice.svelte';
 	import Card from './Card.svelte';
-	import BasePlayer from "./game/BasePlayer";
 	import { basicSpells, specialSpells } from "./utils/spells";
-	import firebase from "./utils/firebase";
-	import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-	import Room from './utils/Room';
+	import { shuffle } from './utils';
+	// import firebase from "./utils/firebase";
+	// import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+	// import Room from './utils/Room';
 
-	const gameRoom = Room;
-	
-	const player1 = {
-	  // Game props
-	  hp: 1,
-	  selectedSpells: [],
-	  activeBuffs: [],
-	  log: [],
-	  // Other cosmetic props
-	};
-	const player2 = {
-	  // Game props
-	  hp: 1,
-	  selectedSpells: [],
-	  activeBuffs: [],
-	  log: [],
-	  // Other cosmetic props
-	};
-
-	const messageDuration = 1000;
-	const auth = getAuth();
-
-	const allSpells = [ ...basicSpells, ...specialSpells ];
-
-	let mounted = false;
-	let gameStarted = false;
-	let rounds = 0;
-	let godSpeaks = true;
-	let maxSpells = 0;
-	let startingHp = 0;
-	let startingPlayer = 0; // 1 is 1 - 2 is 2
-	let shouldPickSpells = false;
-	let finishedSelectingSpells = false;
-	let godNumber = 0;
-	let player1Number = 0;
-	let player2Number = 0;
-	let player1IsRolling = false;
-	let player2IsRolling = false;
-	let bigMessage = '';
-	let background = 'back-darker.png';
-	let userId = '';
-	let roomId = '';
+	// const gameRoom = Room;
+	const messageDelay = 1000;
+	// const auth = getAuth();
 
 	const sounds = {
 		godroll: [
@@ -80,87 +40,125 @@
 			new Audio('/shortpain3.mp3')
 		],
 	}
+
+	let mounted = false;
+	let game = null;
+	let gameStarted = false;
+	let localPickingPlayer = 0; // 0 is p1 1 is p2
+	let godNumber = 0;
+	let godSpeaks = false;
+	let godMessage = 'God Says:';
+	let shouldPickSpells = false;
+	let finishedSelectingSpells = false;
+	let bigMessage = '';
+	let background = 'back-darker.png';
+	// let userId = '';
+	// let roomId = '';
 	let timerCall = () => {};
 	let pauseTimer = false;
 	let timer = null;
+	let allSpells = [
+		...basicSpells,
+		...specialSpells
+	];
+
+	let debug = {
+		diceNumber: -1,
+	};
+
+	function diceRoll(sides = 6) {
+		if (debug.diceNumber > 0) return debug.diceNumber;
+		return Math.floor(Math.random() * sides) + 1;
+	}
+
+	const setupGame = () => {
+		const game = {
+			started: true,
+			currentRound: 1,
+			activePlayer: 0,
+			rounds: diceRoll(),
+			maxSpells: diceRoll(),
+			startingHp: diceRoll(),
+			startingPlayer: (diceRoll() % 2 === 0) ? 2 : 1,
+			players: [
+				{
+					hp: 0,
+					selectedSpells: [],
+					activeBuffs: [],
+					isRolling: false,
+					canRoll: false,
+					diceNumber: 0,
+					canUseSpell: false,
+					godPlaying: true,
+					activeSpell: -1,
+				},
+				{
+					hp: 0,
+					selectedSpells: [],
+					activeBuffs: [],
+					isRolling: false,
+					canRoll: false,
+					diceNumber: 0,
+					canUseSpell: false,
+					godPlaying: true,
+					activeSpell: -1,
+				}
+			]
+		};
+		game.players.forEach(p => p.hp = game.startingHp);
+		return game;
+	};
 
 	async function* gameStep() {
-		// Sign-in to Firebase
-		console.log('Sign-in to Firebase');
-		signInAnonymously(auth)
-				.then(() => {
-					console.log('Anon Auth Successfully!');
-				});
-		onAuthStateChanged(auth, (user) => {
-			if (user) {
-				userId = user.uid;
-				gameRoom.hostId = userId;
-				console.log('User Signed In');
-			} else {
-				console.log('User Signed Out');
-			}
-		});
-
 		// Start Game Message
+		game = setupGame();
+		godSpeaks = true;
 		bigMessage = '';
 		sounds.godroll[0].currentTime = 0;
 		sounds.godroll[0].play();
 		bigMessage = 'Start Game';
+
 		// Start timer
 		timer = setInterval(timerCall, 3000);
 		yield;
 
 		// Roll dice for rounds
-		// @TODO: Only Host rolls as God
-		// 	      Mover state inicial fuera del generator
-			godNumber = (godNumber > 1) ? godNumber - 1 : godNumber + 1;
-			setTimeout(() => {
-				godNumber = Dice.roll();
-				gameRoom.rounds = godNumber;
-				rounds = gameRoom.rounds;
-				sounds.godroll[1].currentTime = 0;
-				sounds.godroll[1].play();
-			}, 500);
+		godNumber = (godNumber > 1) ? godNumber - 1 : godNumber + 1;
+		setTimeout(() => {
+			godNumber = game.rounds;
+			sounds.godroll[1].currentTime = 0;
+			sounds.godroll[1].play();
+		}, 500);
 		bigMessage = '';
 		setTimeout(() => {
-			bigMessage = `${rounds} Rounds`;
-		}, messageDuration);
+			bigMessage = `${game.rounds} Rounds`;
+		}, messageDelay);
 		yield;
 
-		// Roll dice for Spells
-		// @TODO: Only Host rolls as God
-		// 	      Mover state inicial fuera del generator
-			godNumber = (godNumber > 1) ? godNumber - 1 : godNumber + 1;
-			setTimeout(() => {
-				godNumber = Dice.roll();
-				gameRoom.spells = godNumber;
-				maxSpells = gameRoom.spells;
-				sounds.godroll[1].currentTime = 0;
-				sounds.godroll[1].play();
-			}, 500);
+		// Roll dice for spells
+		godNumber = (godNumber > 1) ? godNumber - 1 : godNumber + 1;
+		setTimeout(() => {
+			godNumber = game.maxSpells;
+			sounds.godroll[1].currentTime = 0;
+			sounds.godroll[1].play();
+		}, 500);
 		bigMessage = '';
 		setTimeout(() => {
-			bigMessage = `Max ${maxSpells} Spells`;
-		}, messageDuration);
+			bigMessage = `Max ${game.maxSpells} Spells`;
+		}, messageDelay);
 		yield;
 
 		// Roll dice for HP
-		// @TODO: Only Host rolls as God
-		// 	      Mover state inicial fuera del generator
-			godNumber = (godNumber > 1) ? godNumber - 1 : godNumber + 1;
-			setTimeout(() => {
-				godNumber = Dice.roll();
-				gameRoom.hp = godNumber;
-				startingHp = gameRoom.hp;
-				player1.hp = gameRoom.hp;
-				player2.hp = gameRoom.hp;
-				sounds.godroll[1].currentTime = 0;
-				sounds.godroll[1].play();
-			}, 500);
+		godNumber = (godNumber > 1) ? godNumber - 1 : godNumber + 1;
+		setTimeout(() => {
+			godNumber = game.startingHp;
+			sounds.godroll[1].currentTime = 0;
+			sounds.godroll[1].play();
+		}, 500);
 		bigMessage = '';
 		setTimeout(() => {
-			bigMessage = `With ${startingHp} HP`;
-		}, messageDuration);
+			bigMessage = `With ${game.startingHp} HP`;
+		}, messageDelay);
 		yield;
 
 		// Pick Spells
@@ -172,39 +170,27 @@
 		yield;
 
 		// See who starts
-		// @TODO: Only Host rolls as God
-		// 	      Mover state inicial fuera del generator
-			godNumber = (godNumber > 1) ? godNumber - 1 : godNumber + 1;
-			setTimeout(() => {
-				let tempNumber = Dice.roll();
-				godNumber = (tempNumber > 3) ? 1 : 2;
-				gameRoom.current_turn = godNumber;
-				startingPlayer = gameRoom.current_turn;
-				sounds.godroll[1].currentTime = 0;
-				sounds.godroll[1].play();
-			}, 500);
+		godNumber = (godNumber > 1) ? godNumber - 1 : godNumber + 1;
+		setTimeout(() => {
+			godNumber = game.startingPlayer;
+			sounds.godroll[1].currentTime = 0;
+			sounds.godroll[1].play();
+		}, 500);
 		bigMessage = '';
 		setTimeout(() => {
-			bigMessage = `Player ${startingPlayer} starts`;
-			setTimeout(async () => {
+			bigMessage = `Player ${game.startingPlayer} starts`;
+			setTimeout(() => {
 				bigMessage = '';
 				godSpeaks = false;
 				gameStarted = true;
+				game.activePlayer = game.startingPlayer;
+				game.players[game.activePlayer-1].canRoll = true;
+				game = game;
 
-				// Assign GameRoom ID
-				console.log('Assigning GameRoom ID');
-				await gameRoom.getId();
-				await gameRoom.setTurn(gameRoom.current_turn)
-				console.log('Current Turn:', gameRoom.current_turn);
-				yield;
+				console.log('Active Player:', game.activePlayer);
 			}, 3000);
-		}, messageDuration);
-
-		while(player1.hp > 0 && player2.hp > 0) {
-			console.log('Current Turn:', gameRoom.current_turn);
-			// gameRoom.switchTurn();
-			yield;
-		}
+		}, messageDelay);
+		yield;
 	}
 
 	const currentStep = gameStep();
@@ -217,119 +203,184 @@
 		mounted = true;
 	});
 
-	$: if (maxSpells > 0 && player1.selectedSpells.length >= maxSpells && mounted) {
+	const playerRollDice = () => {
+		const cp = game.activePlayer - 1;
+		if (game.players[cp].isRolling || !game.players[cp].canRoll) return;
+
+		game.players[cp].isRolling = true;
+		sounds.godroll[2].currentTime = 0;
+		sounds.godroll[2].play();
+		game.players[cp].diceNumber = (game.players[cp].diceNumber > 1) ? game.players[cp].diceNumber - 1 : game.players[cp].diceNumber + 1; // @FIXME: 1 and 5 is not synched with audio
+		game = game;
+		setTimeout(() => {
+			game.players[cp].diceNumber = diceRoll();
+			game = game;
+		}, 500);
+		setTimeout(() => {
+			game.players[cp].isRolling = false;
+			game = game;
+
+			// Player Plays
+			if (game.players[cp].diceNumber % 2 === 0) {
+				setTimeout(() => {
+					bigMessage = "Player picks";
+					console.log('Player plays');
+					game.players[cp].godPlaying = false;
+					game.players[cp].canUseSpell = true;
+					game.players[cp].canRoll = false;
+					game = game;
+					setTimeout(() => {
+						bigMessage = "";
+					}, 2000);
+				}, 500);
+
+			// God Plays
+			} else {
+				console.log('God plays');
+				let tempNumber = diceRoll(game.maxSpells);
+				godSpeaks = true;
+				godMessage = 'God Plays:';
+				godNumber = (godNumber > 1) ? godNumber - 1 : godNumber + 1;
+				setTimeout(() => {
+					godNumber = tempNumber;
+					sounds.godroll[1].currentTime = 0;
+					sounds.godroll[1].play();
+				}, 500);
+				setTimeout(() => {
+					game.players[cp].activeSpell = tempNumber;
+					bigMessage = `Use ${game.players[cp].selectedSpells[game.players[cp].activeSpell-1].name}`;
+					game.players[cp].godPlaying = true;
+					game.players[cp].canUseSpell = false;
+					game.players[cp].canRoll = false;
+					game = game;
+					setTimeout(() => {
+						bigMessage = '';
+						godSpeaks = false;
+						godMessage = '';
+						useSpell(cp, game.players[cp].selectedSpells[game.players[cp].activeSpell-1], game.players[cp].activeSpell-1);
+					}, 2000);
+				}, messageDelay);
+			}
+		}, 2000);
+	};
+
+	const useSpell = (playerNo, spell, spellIndex) => {
+		game.players[playerNo].canUseSpell = false;
+		console.log('Player', playerNo, 'using spell:', spell.name, `(${spellIndex})`);
+		sounds.shortpain[1].currentTime = 0;
+		sounds.shortpain[1].play();
+	};
+
+	const selectSpell = (spell) => {
+		sounds.click[0].currentTime = 0;
+		sounds.click[0].play();
+		game.players[localPickingPlayer].selectedSpells.push(spell);
+		game = game;
+
+		if (game.players[localPickingPlayer].selectedSpells.length >= game.maxSpells) {
+			localPickingPlayer += 1;
+			allSpells = shuffle(allSpells);
+			// @TODO: Add correct sound
+			// sounds.godroll[1].currentTime = 0;
+			// sounds.godroll[1].play();
+		}
+	};
+
+	$: if (game && game.players && game.maxSpells > 0 && game.players[1].selectedSpells.length >= game.maxSpells && mounted) {
 		finishedSelectingSpells = true;
 		shouldPickSpells = false;
 		currentStep.next();
 	}
-
-	const playerRollDice = () => {
-		if (player1IsRolling) return;
-
-		player1IsRolling = true;
-		sounds.godroll[2].currentTime = 0;
-		sounds.godroll[2].play();
-		// @FIXME: 1 and 5 is not synched with audio
-		player1Number = (player1Number > 1) ? player1Number - 1 : player1Number + 1;
-		setTimeout(() => {
-			player1Number = Dice.roll();
-		}, 500);
-		setTimeout(() => {
-			player1IsRolling = false;
-		}, 2000);
-	};
-
-	const selectSpell = (spell) => {
-		if (player1.selectedSpells.length >= maxSpells) return;
-
-		sounds.click[0].currentTime = 0;
-		sounds.click[0].play();
-
-		player1.selectedSpells.push(spell);
-		player1.selectedSpells = player1.selectedSpells; // Trigger reactivity, no borres
-		// @TODO: no se todabvia
-		player2.selectedSpells.push(spell);
-		player2.selectedSpells = player2.selectedSpells; // Trigger reactivity, no borres
-	};
 </script>
 
 <div
-	class="w-full h-screen bg-cover overflow-hidden"
+	class="w-full h-screen bg-cover overflow-hidden font-verga"
 	style="background-image: url(/{background})">
 	<div
 		class="top-0 left-0 absolute w-full h-full bg-cover pointer-events-none"
 		style="background-image: url(/clouds.png)">
 	</div>
-	<div class="w-full h-full grid grid-cols-[4fr_8fr_4fr]">
-		<div class="p-2 grid grid-rows-[1fr_auto] gap-2">
-			<div class="overflow-scroll p-2 text-black">
-				
-			</div>
-			<div class="bg-stone-800 grid gap-2 p-2">
-				{#each player1.selectedSpells as spell, i}
-					<button
-						class="text-white text-16 w-full text-left bg-black/20 z-[20] relative p-2 hover:bg-black/40 active:bg-black/80">
-						{spell.name}
-					</button>
-				{/each}
-			</div>
-		</div>
-		<div class="relative">
-			{#if godSpeaks}
-				<div class="absolute top-0 left-1/2 -translate-x-1/2 flex gap-5 whitespace-nowrap text-white text-64">
-					God Says:
+	{#if game}
+		<div class="w-full h-full grid grid-cols-[4fr_8fr_4fr]">
+			<div class="p-2 grid grid-rows-[1fr_auto] gap-2">
+				<div class="overflow-scroll p-2 text-black">
+					
 				</div>
-			{/if}
-			<div class="absolute bottom-3 left-[6%] w-[35%] h-3/4 flex items-center justify-center">
-				<img src="/p1.png" alt="" class="object-bottom w-full h-full object-contain"/>
-				{#if gameStarted}
-					<button class="absolute -right-4 w-14 h-14 bottom-5 z-[10]" on:click={() => playerRollDice()} disabled={player1IsRolling ? true : null}>
-						<Dado show={player1Number} throwDuration={1000} />
-					</button>
+				<div class="bg-stone-800 grid gap-2 p-2">
+					{#each game.players[0].selectedSpells as spell, i}
+						<button
+							on:click={() => useSpell(0, spell, i)}
+							disabled={!game.players[0].canUseSpell ? true : null}
+							class="text-white text-16 w-full text-left bg-black/20 z-[20] relative p-2 {game.players[0].canUseSpell ? 'hover:bg-black/40 active:bg-black/80' : 'opacity-50'}">
+							{spell.name}
+						</button>
+					{/each}
+				</div>
+			</div>
+			<div class="relative">
+				{#if godSpeaks}
+					<div class="absolute top-0 left-1/2 -translate-x-1/2 flex gap-5 whitespace-nowrap text-white text-64">
+						{godMessage}
+					</div>
+				{/if}
+				<div transition:blur class="absolute bottom-3 left-[6%] w-[35%] h-3/4 flex items-center justify-center">
+					<img draggable="false" src="/p1.png" alt="" class="object-bottom w-full h-full object-contain"/>
+					{#if gameStarted && game.activePlayer === 1}
+						<button
+							class="absolute -right-4 w-14 h-14 bottom-5 z-[10] {!game.players[0].canRoll ? 'opacity-50' : ''}"
+							disabled={game.players[0].isRolling || !game.players[0].canRoll ? true : null}
+							on:click={() => playerRollDice()}>
+							<Dice show={game.players[0].diceNumber} throwDuration={1000} />
+						</button>
+					{/if}
+				</div>
+				<div transition:blur class="absolute bottom-3 right-[6%] w-[35%] h-3/4 flex items-center justify-center">
+					<img draggable="false" src="/p2.png" alt="" class="object-bottom w-full h-full object-contain"/>
+					{#if gameStarted && game.activePlayer === 2}
+						<button
+							class="absolute -left-4 w-14 h-14 bottom-5 z-[10] {!game.players[1].canRoll ? 'opacity-50' : ''}"
+							disabled={game.players[1].isRolling || !game.players[1].canRoll ? true : null}
+							on:click={() => playerRollDice()}>
+							<Dice show={game.players[1].diceNumber} throwDuration={1000} />
+						</button>
+					{/if}
+				</div>
+				{#if godSpeaks}
+					<div class="absolute top-28 left-1/2 -translate-x-1/2 w-14 h-14">
+						<Dice show={godNumber} />
+					</div>
 				{/if}
 			</div>
-			<div class="absolute bottom-3 right-[6%] w-[35%] h-3/4 flex items-center justify-center">
-				<img src="/p2.png" alt="" class="object-bottom w-full h-full object-contain"/>
-				{#if gameStarted}
-					<button class="absolute -left-4 w-14 h-14 bottom-5 z-[10]" on:click={() => playerRollDice()} disabled={player2IsRolling ? true : null}>
-						<Dado show={player2Number} throwDuration={1000} />
-					</button>
-				{/if}
-			</div>
-			{#if godSpeaks}
-				<div class="absolute top-28 left-1/2 -translate-x-1/2 w-14 h-14">
-					<Dado show={godNumber} />
+			<div class="p-2 grid grid-rows-[1fr_auto] gap-2">
+				<div class="overflow-scroll p-2 text-black">
+					
 				</div>
-			{/if}
-		</div>
-		<div class="p-2 grid grid-rows-[1fr_auto] gap-2">
-			<div class="overflow-scroll p-2 text-black">
-				
-			</div>
-			<div class="bg-stone-800 grid gap-2 p-2">
-				{#each player2.selectedSpells as spell, i}
-					<button
-						class="text-white text-16 w-full text-left bg-black/20 z-[20] relative p-2 hover:bg-black/40 active:bg-black/80">
-						{spell.name}
-					</button>
-				{/each}
+				<div class="bg-stone-800 grid gap-2 p-2">
+					{#each game.players[1].selectedSpells as spell, i}
+						<button
+							on:click={() => useSpell(1, spell, i)}
+							disabled={!game.players[1].canUseSpell ? true : null}
+							class="text-white text-16 w-full text-left bg-black/20 z-[20] relative p-2 {game.players[1].canUseSpell ? 'hover:bg-black/40 active:bg-black/80' : 'opacity-50'}">
+							{spell.name}
+						</button>
+					{/each}
+				</div>
 			</div>
 		</div>
-	</div>
+	{/if}
 	<div
 		class="top-0 left-0 absolute w-full h-full bg-cover pointer-events-none animate-mist opacity-50"
 		style="background-image: url(/mist.png)">
 	</div>
 	{#if bigMessage || shouldPickSpells}
 		<div transition:scale={{ duration: 150, easing: quintOut }} class="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center z-[50]">
-			<!-- <div class="bg-white rounded-full absolute w-full mt-2 h-full top-0 left-0 blur opacity-50"></div> -->
 			<div class="relative whitespace-nowrap text-64 text-white pointer-events-none">
 				{bigMessage}
 			</div>
 			{#if shouldPickSpells && !finishedSelectingSpells}
 				<div class="text-white text-24 bg-black p-4">
 					<div class="mb-4 w-112 pb-1 border-b-2 border-white">
-						Select {maxSpells} Spell{maxSpells > 1 ? 's' : ''}
+						{localPickingPlayer !== -1 ? `Player ${localPickingPlayer === 0 ? 'One, ' : 'Two, '}` : ''} Select {game.maxSpells} Spell{game.maxSpells > 1 ? 's' : ''}
 					</div>
 					<div class="grid grid-cols-[auto_1fr]">
 						<div class="grid gap-2">
@@ -337,8 +388,8 @@
 								<div class="relative">
 									<button
 										on:click={() => selectSpell(spell)}
-										disabled={player1.selectedSpells.find(s => s.name === spell.name)}
-										class="{player1.selectedSpells.find(s => s.name === spell.name) ? 'bg-white' : '[&:hover+div]:block hover:bg-white hover:text-black'} text-24 w-full text-left">
+										disabled={game.players[localPickingPlayer].selectedSpells.find(s => s.name === spell.name)}
+										class="{game.players[localPickingPlayer].selectedSpells.find(s => s.name === spell.name) ? 'bg-white' : '[&:hover+div]:block hover:bg-white hover:text-black'} text-24 w-full text-left">
 										{spell.name}
 									</button>
 									<div class="hidden absolute right-0 translate-x-[calc(100%+1rem)] w-80 top-0 bg-white text-black z-[60] p-2">
@@ -355,48 +406,32 @@
 </div>
 <CardManager>
 	<Card x={48} y={48} classes="grid gap-2">
-		<button
-			non-draggable
-			on:click={() => currentStep.next()}
-			class="bg-blue-600 text-white px-2 py-1.5 rounded-8 active:bg-blue-700 cursor-auto">
-			Next Step
-		</button>
+		<h1 class="text-20 font-medium tracking-title">Dance Master: Alpha</h1>
+		<hr />
+		<div class="grid gap-2 grid-cols-2">
+			<button
+				non-draggable
+				on:click={() => currentStep.next()}
+				class="bg-blue-600 text-white px-2 py-1.5 rounded-8 active:bg-blue-700 cursor-auto font-medium">
+				Play Offline
+			</button>
+			<button
+				non-draggable
+				on:click={() => currentStep.next()}
+				class="bg-blue-600 text-white px-2 py-1.5 rounded-8 active:bg-blue-700 cursor-auto font-medium">
+				Play Online
+			</button>
+		</div>
+		<hr />
+		<div class="grid gap-1">
+			<span>Dice Hijack</span>
+			<input
+				non-draggable
+				bind:value={debug.diceNumber}
+				type="text"
+				class="border border-gray-b rounded-8 h-8 px-2"/>
+		</div>
 	</Card>
-	<!-- {#each HOLONS as h, index}
-		{#if h.ui.visible}
-			<Card bind:x={h.ui.x} bind:y={h.ui.y} classes="grid gap-2" cardId={h.ui.id}>
-				<div class="font-medium pb-2 border-b border-gray-200 flex justify-between gap-4 items-center">
-					{h.name}
-					<p class="rounded-8 px-2 py-1 {h.relations['canBePartOf'] && h.relations['canBePartOf'].length > 1 ? 'bg-yellow-300' : 'bg-green-300'}">
-						{#if h.relations['canBePartOf'] && h.relations['canBePartOf'].length > 1}
-							Could be 1 in {h.relations['canBePartOf'].length} identities
-						{:else}
-							1 Possible Identity
-						{/if}
-					</p>
-				</div>
-				{#each Object.keys(h.relations) as r}
-					<div>
-						<p class="text-14">{r}</p>
-						<ul class="grid">
-							{#each h.relations[r] as link}
-								<li
-									non-draggable
-									on:click={() => showUI(link)}
-									class="inline-block w-fit text-blue-600 font-medium hover:underline cursor-auto">
-									- {link}
-								</li>
-							{/each}
-						</ul>
-					</div>
-				{/each}
-				<div>
-					<p class="text-14 mb-1 pt-1 mt-1 border-t border-gray-200">Neighboring Rules</p>
-					<pre class="w-full overflow-auto bg-gray-800 text-white font-mono p-2 rounded-4">{`V <- H -> S\n---\nV = CH_VOID\nH = CH_HASH\nS = CH_SPACE`}</pre>
-				</div>
-			</Card>
-		{/if}
-	{/each} -->
 </CardManager>
 <style>
 </style>

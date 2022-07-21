@@ -8,7 +8,7 @@ module.exports = {
 	],
 	theme: {
 		fontFamily: {
-			'sans': [ 'Oldstyle HPLHS', '-apple-system', 'Inter', 'Roboto', 'Helvetica', 'Sans-Serif' ],
+			'sans': [ '-apple-system', 'Inter', 'Roboto', 'Helvetica', 'Sans-Serif' ],
 			'verga': ['Oldstyle HPLHS']
 		},
 		fontSize: {

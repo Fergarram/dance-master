@@ -69,7 +69,7 @@ export const basicSpells = [
 		}
 	},
 	{
-		name: "Bit",
+		name: "Bite",
 		ui_state: {},
 		description: 'Deals 1 DMG to opponent.',
 		disabled: false,

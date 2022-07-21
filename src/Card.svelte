@@ -13,7 +13,7 @@
     let cardIndex = addCard(cardId);
     addListener(() => {
         cardIndex = getStack().indexOf(cardId);
-        if (card) card.style.zIndex = cardIndex;
+        if (card) card.style.zIndex = 10000 + cardIndex;
     });
 
     let isDragging = false;

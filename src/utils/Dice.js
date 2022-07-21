@@ -1,9 +1,3 @@
-const dice = {
-  sides: 6,
-  roll: function () {
-    return Math.floor(Math.random() * this.sides) + 1;
-    // return 3
-  }
+export function DiceRoll(sides = 6) {
+  return Math.floor(Math.random() * sides) + 1;
 }
-
-export default dice;
