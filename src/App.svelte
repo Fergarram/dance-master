@@ -12,7 +12,8 @@
 	import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 	import { room } from './store';
 
-	const gameRoom = Room;
+	const gameRoom = $room;
+	console.log(gameRoom, $room);
 	
 	const player1 = {
 	  // Game props
@@ -196,7 +197,7 @@
 				await gameRoom.getId();
 				await gameRoom.setTurn(gameRoom.current_turn)
 				console.log('Current Turn:', gameRoom.current_turn);
-				yield;
+				// yield;
 			}, 3000);
 		}, messageDuration);
 
@@ -263,7 +264,7 @@
 	<div class="w-full h-full grid grid-cols-[4fr_8fr_4fr]">
 		<div class="p-2 grid grid-rows-[1fr_auto] gap-2">
 			<div class="overflow-scroll p-2 text-black">
-				
+			
 			</div>
 			<div class="bg-stone-800 grid gap-2 p-2">
 				{#each player1.selectedSpells as spell, i}
@@ -304,7 +305,7 @@
 		</div>
 		<div class="p-2 grid grid-rows-[1fr_auto] gap-2">
 			<div class="overflow-scroll p-2 text-black">
-				
+			
 			</div>
 			<div class="bg-stone-800 grid gap-2 p-2">
 				{#each player2.selectedSpells as spell, i}
